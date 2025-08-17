@@ -1,4 +1,4 @@
-  # YouTube Automator Unified
+# YouTube Automator Unified
 
 A comprehensive YouTube automation tool that combines video processing, AI-powered metadata generation, and direct YouTube upload capabilities.
 
