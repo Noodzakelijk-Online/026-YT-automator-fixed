@@ -1,284 +1,47 @@
-"""
-Playlist management routes for YouTube API
-"""
+from flask import Blueprint, jsonify, request
 
-from flask import Blueprint, request, jsonify
-from googleapiclient.errors import HttpError
-import logging
-from services.youtube_service import get_youtube_service
+from errors import ApiError
+from services.youtube_service import execute_with_retry, service_for
 
-logger = logging.getLogger(__name__)
 
-playlists_bp = Blueprint('playlists', __name__)
+playlists_bp = Blueprint("playlists", __name__)
 
-@playlists_bp.route('/', methods=['GET'])
+
+@playlists_bp.get("")
+@playlists_bp.get("/")
 def list_playlists():
-    """List user's YouTube playlists"""
-    try:
-        youtube = get_youtube_service()
-        if not youtube:
-            return jsonify({'error': 'YouTube authentication required'}), 401
-        
-        playlists = []
-        next_page_token = None
-        
-        while True:
-            request_params = {
-                'part': 'snippet,status',
-                'mine': True,
-                'maxResults': 50
-            }
-            
-            if next_page_token:
-                request_params['pageToken'] = next_page_token
-            
-            response = youtube.playlists().list(**request_params).execute()
-            
-            for item in response.get('items', []):
-                playlist_info = {
-                    'id': item['id'],
-                    'title': item['snippet']['title'],
-                    'description': item['snippet'].get('description', ''),
-                    'thumbnail': item['snippet'].get('thumbnails', {}).get('default', {}).get('url'),
-                    'privacy_status': item['status']['privacyStatus'],
-                    'video_count': item.get('contentDetails', {}).get('itemCount', 0),
-                    'created_at': item['snippet']['publishedAt']
-                }
-                playlists.append(playlist_info)
-            
-            next_page_token = response.get('nextPageToken')
-            if not next_page_token:
-                break
-        
-        return jsonify({
-            'playlists': playlists,
-            'total_count': len(playlists),
-            'status': 'success'
-        })
-        
-    except HttpError as e:
-        logger.error(f"YouTube API error: {e}")
-        return jsonify({
-            'error': f'YouTube API error: {e}',
-            'status': 'error'
-        }), 400
-    
-    except Exception as e:
-        logger.error(f"Error listing playlists: {e}")
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
+    youtube = service_for()
+    items, token = [], None
+    while True:
+        response = execute_with_retry(lambda: youtube.playlists().list(part="snippet,status,contentDetails", mine=True,
+                                                                       maxResults=50, pageToken=token).execute())
+        items.extend({"id": item["id"], "title": item["snippet"]["title"],
+                      "description": item["snippet"].get("description", ""),
+                      "privacy_status": item["status"]["privacyStatus"],
+                      "video_count": item.get("contentDetails", {}).get("itemCount", 0)} for item in response.get("items", []))
+        token = response.get("nextPageToken")
+        if not token: break
+    return jsonify({"playlists": items})
 
-@playlists_bp.route('/', methods=['POST'])
+
+@playlists_bp.post("")
+@playlists_bp.post("/")
 def create_playlist():
-    """Create a new YouTube playlist"""
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        title = data.get('title')
-        description = data.get('description', '')
-        privacy_status = data.get('privacy_status', 'private')
-        
-        if not title:
-            return jsonify({'error': 'Playlist title is required'}), 400
-        
-        # Validate privacy status
-        valid_privacy = ['private', 'public', 'unlisted']
-        if privacy_status not in valid_privacy:
-            privacy_status = 'private'
-        
-        youtube = get_youtube_service()
-        if not youtube:
-            return jsonify({'error': 'YouTube authentication required'}), 401
-        
-        playlist_body = {
-            'snippet': {
-                'title': title,
-                'description': description
-            },
-            'status': {
-                'privacyStatus': privacy_status
-            }
-        }
-        
-        response = youtube.playlists().insert(
-            part='snippet,status',
-            body=playlist_body
-        ).execute()
-        
-        playlist_info = {
-            'id': response['id'],
-            'title': response['snippet']['title'],
-            'description': response['snippet']['description'],
-            'privacy_status': response['status']['privacyStatus'],
-            'created_at': response['snippet']['publishedAt']
-        }
-        
-        return jsonify({
-            'playlist': playlist_info,
-            'status': 'success',
-            'message': 'Playlist created successfully'
-        })
-        
-    except HttpError as e:
-        logger.error(f"YouTube API error: {e}")
-        return jsonify({
-            'error': f'YouTube API error: {e}',
-            'status': 'error'
-        }), 400
-    
-    except Exception as e:
-        logger.error(f"Error creating playlist: {e}")
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
+    data = request.get_json(silent=True) or {}
+    title, privacy = str(data.get("title", "")).strip(), data.get("privacy_status", "private")
+    if not title: raise ApiError("Playlist title is required", 422, "validation_error")
+    if privacy not in {"private", "unlisted", "public"}: raise ApiError("Invalid privacy status", 422, "validation_error")
+    response = execute_with_retry(lambda: service_for().playlists().insert(part="snippet,status", body={
+        "snippet": {"title": title, "description": str(data.get("description", ""))},
+        "status": {"privacyStatus": privacy}}).execute())
+    return jsonify({"playlist": {"id": response["id"], "title": response["snippet"]["title"],
+                                  "privacy_status": response["status"]["privacyStatus"]}}), 201
 
-@playlists_bp.route('/<playlist_id>/videos', methods=['GET'])
-def list_playlist_videos(playlist_id):
-    """List videos in a specific playlist"""
-    try:
-        youtube = get_youtube_service()
-        if not youtube:
-            return jsonify({'error': 'YouTube authentication required'}), 401
-        
-        videos = []
-        next_page_token = None
-        
-        while True:
-            request_params = {
-                'part': 'snippet',
-                'playlistId': playlist_id,
-                'maxResults': 50
-            }
-            
-            if next_page_token:
-                request_params['pageToken'] = next_page_token
-            
-            response = youtube.playlistItems().list(**request_params).execute()
-            
-            for item in response.get('items', []):
-                video_info = {
-                    'id': item['snippet']['resourceId']['videoId'],
-                    'title': item['snippet']['title'],
-                    'description': item['snippet']['description'],
-                    'thumbnail': item['snippet'].get('thumbnails', {}).get('default', {}).get('url'),
-                    'position': item['snippet']['position'],
-                    'added_at': item['snippet']['publishedAt']
-                }
-                videos.append(video_info)
-            
-            next_page_token = response.get('nextPageToken')
-            if not next_page_token:
-                break
-        
-        return jsonify({
-            'videos': videos,
-            'playlist_id': playlist_id,
-            'total_count': len(videos),
-            'status': 'success'
-        })
-        
-    except HttpError as e:
-        logger.error(f"YouTube API error: {e}")
-        return jsonify({
-            'error': f'YouTube API error: {e}',
-            'status': 'error'
-        }), 400
-    
-    except Exception as e:
-        logger.error(f"Error listing playlist videos: {e}")
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
 
-@playlists_bp.route('/<playlist_id>/videos', methods=['POST'])
-def add_video_to_playlist(playlist_id):
-    """Add a video to a playlist"""
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        video_id = data.get('video_id')
-        
-        if not video_id:
-            return jsonify({'error': 'Video ID is required'}), 400
-        
-        youtube = get_youtube_service()
-        if not youtube:
-            return jsonify({'error': 'YouTube authentication required'}), 401
-        
-        playlist_item_body = {
-            'snippet': {
-                'playlistId': playlist_id,
-                'resourceId': {
-                    'kind': 'youtube#video',
-                    'videoId': video_id
-                }
-            }
-        }
-        
-        response = youtube.playlistItems().insert(
-            part='snippet',
-            body=playlist_item_body
-        ).execute()
-        
-        return jsonify({
-            'playlist_item_id': response['id'],
-            'video_id': video_id,
-            'playlist_id': playlist_id,
-            'status': 'success',
-            'message': 'Video added to playlist successfully'
-        })
-        
-    except HttpError as e:
-        logger.error(f"YouTube API error: {e}")
-        return jsonify({
-            'error': f'YouTube API error: {e}',
-            'status': 'error'
-        }), 400
-    
-    except Exception as e:
-        logger.error(f"Error adding video to playlist: {e}")
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
-
-@playlists_bp.route('/<playlist_id>', methods=['DELETE'])
-def delete_playlist(playlist_id):
-    """Delete a YouTube playlist"""
-    try:
-        youtube = get_youtube_service()
-        if not youtube:
-            return jsonify({'error': 'YouTube authentication required'}), 401
-        
-        youtube.playlists().delete(id=playlist_id).execute()
-        
-        return jsonify({
-            'playlist_id': playlist_id,
-            'status': 'success',
-            'message': 'Playlist deleted successfully'
-        })
-        
-    except HttpError as e:
-        logger.error(f"YouTube API error: {e}")
-        return jsonify({
-            'error': f'YouTube API error: {e}',
-            'status': 'error'
-        }), 400
-    
-    except Exception as e:
-        logger.error(f"Error deleting playlist: {e}")
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
+@playlists_bp.get("/categories")
+def categories():
+    region = request.args.get("region", "US")
+    response = execute_with_retry(lambda: service_for().videoCategories().list(part="snippet", regionCode=region).execute())
+    return jsonify({"categories": [{"id": item["id"], "title": item["snippet"]["title"]}
+                                    for item in response.get("items", []) if item["snippet"].get("assignable")]})
 

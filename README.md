@@ -1,229 +1,172 @@
-# YouTube Automator Unified
+# StudioPilot — YouTube Automator
 
-A comprehensive YouTube automation tool that combines video processing, AI-powered metadata generation, and direct YouTube upload capabilities.
-
-## Features
-
-### Frontend (React/TypeScript)
-- **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
-- **Video Upload**: Drag-and-drop video file selection
-- **Real-time Processing**: Live updates on video processing status
-- **Metadata Management**: Edit and customize video metadata before upload
-- **Authentication**: Secure Google OAuth integration
-- **Progress Tracking**: Visual upload progress indicators
-
-### Backend (Python/Flask)
-- **YouTube API Integration**: Direct video upload to YouTube
-- **AI-Powered Metadata**: OpenAI GPT-4 integration for title and description generation
-- **Authentication**: Google OAuth2 flow with token management
-- **Playlist Management**: Create and manage YouTube playlists
-- **Speed Testing**: Network upload speed measurement
-- **Transcription**: Video-to-text conversion (extensible)
-- **Thumbnail Generation**: Automated thumbnail creation
+StudioPilot is a full-stack dashboard for preparing and publishing YouTube videos. It stores every video as a durable draft, supports optional AI metadata and transcription, creates thumbnail candidates, manages playlists, and sends immediate or scheduled uploads through a database-backed worker. A video is marked `uploaded` only after the official YouTube Data API returns a video ID.
 
 ## Architecture
 
-```
-youtube-automator-unified/
-├── frontend/                 # React TypeScript application
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── pages/          # Page components
-│   │   └── assets/         # Static assets
-│   ├── public/
-│   └── package.json
-├── backend/                  # Flask API server
-│   ├── app.py              # Main Flask application
-│   ├── routes/             # API route modules
-│   │   ├── auth.py         # Authentication endpoints
-│   │   ├── upload.py       # Video upload endpoints
-│   │   ├── metadata.py     # Metadata generation endpoints
-│   │   └── playlists.py    # Playlist management endpoints
-│   ├── services/           # Business logic services
-│   │   ├── youtube_service.py
-│   │   ├── transcription_service.py
-│   │   └── thumbnail_service.py
-│   └── requirements.txt
-├── shared/                   # Shared configurations
-├── docs/                     # Documentation
-└── README.md
-```
+- `frontend/`: React 18, TypeScript, Vite dashboard and typed API client.
+- `backend/`: Flask API, SQLAlchemy models, Flask-Migrate migrations, Google OAuth, OpenAI services, and durable worker.
+- SQLite is the local default. Set a PostgreSQL `DATABASE_URL` in production.
+- Uploaded video and generated thumbnail files use local disk by default. Production deployments with more than one host must mount shared durable storage or replace this storage adapter.
+- The worker claims due jobs from the database. SQLite is appropriate for one worker; PostgreSQL is required for reliable multi-worker row locking.
 
-## Setup Instructions
+## Local setup
 
-### Prerequisites
-- Node.js 18+ and npm/yarn
-- Python 3.8+
-- Google Cloud Project with YouTube Data API v3 enabled
-- OpenAI API key (optional, for AI features)
+Prerequisites: Python 3.11–3.13 with `venv`, Node.js 20+, npm, and optionally FFmpeg for preparing audio outside the app.
 
-### Backend Setup
-
-1. **Install Python dependencies:**
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
-
-2. **Set up Google API credentials:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing one
-   - Enable YouTube Data API v3
-   - Create OAuth 2.0 credentials (Desktop application)
-   - Download the credentials JSON file as `credentials.json`
-   - Place it in the `backend/` directory
-
-3. **Configure environment variables:**
-   ```bash
-   # Create .env file in backend directory
-   GOOGLE_CLIENT_SECRETS_FILE=credentials.json
-   TOKEN_FILE=token.json
-   OPENAI_API_KEY=your_openai_api_key_here
-   SECRET_KEY=your_secret_key_here
-   FLASK_ENV=development
-   ```
-
-4. **Run the backend server:**
-   ```bash
-   python app.py
-   ```
-   The API will be available at `http://localhost:5000`
-
-### Frontend Setup
-
-1. **Install Node.js dependencies:**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-2. **Configure environment variables:**
-   ```bash
-   # Create .env file in frontend directory
-   REACT_APP_API_URL=http://localhost:5000/api
-   ```
-
-3. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
-   The application will be available at `http://localhost:5173`
-
-## API Endpoints
-
-### Authentication
-- `GET /api/auth/status` - Check authentication status
-- `GET /api/auth/login` - Initiate OAuth flow
-- `GET /api/auth/callback` - Handle OAuth callback
-- `POST /api/auth/logout` - Logout user
-
-### Video Upload
-- `POST /api/upload/video` - Upload video to YouTube
-- `POST /api/upload/validate` - Validate video file
-
-### Metadata Generation
-- `POST /api/metadata/generate` - Generate complete metadata
-- `POST /api/metadata/title` - Generate title only
-- `POST /api/metadata/description` - Generate description only
-- `POST /api/metadata/keywords` - Generate keywords
-
-### Playlist Management
-- `GET /api/playlists/` - List user playlists
-- `POST /api/playlists/` - Create new playlist
-- `GET /api/playlists/{id}/videos` - List playlist videos
-- `POST /api/playlists/{id}/videos` - Add video to playlist
-- `DELETE /api/playlists/{id}` - Delete playlist
-
-### Utilities
-- `GET /api/health` - Health check
-- `GET /api/speed-test` - Test upload speed
-
-## Usage
-
-1. **Start both servers** (backend and frontend)
-2. **Open the application** in your browser
-3. **Authenticate** with your Google account
-4. **Upload a video** using the file selector
-5. **Review and edit** the AI-generated metadata
-6. **Upload to YouTube** with a single click
-
-## Features in Detail
-
-### AI-Powered Metadata Generation
-The system uses OpenAI's GPT-4 to generate:
-- Compelling video titles (max 60 characters)
-- Detailed descriptions (200-500 words)
-- SEO-optimized tags
-- Appropriate category suggestions
-
-### Authentication Flow
-- Secure OAuth2 implementation
-- Token refresh handling
-- Session management
-- Graceful error handling
-
-### Video Processing
-- File validation and size checking
-- Progress tracking during upload
-- Error handling and retry logic
-- Support for multiple video formats
-
-### Extensible Architecture
-- Modular service design
-- Easy to add new features
-- Configurable AI prompts
-- Plugin-ready structure
-
-## Development
-
-### Adding New Features
-1. **Backend**: Add new routes in `routes/` directory
-2. **Frontend**: Create new components in `src/components/`
-3. **Services**: Add business logic in `services/` directory
-
-### Testing
 ```bash
-# Backend tests
+git clone https://github.com/Noodzakelijk-Online/026-YT-automator-fixed.git
+cd 026-YT-automator-fixed
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env
 cd backend
-python -m pytest
-
-# Frontend tests
-cd frontend
-npm test
+flask --app app db upgrade
+flask --app app run --debug
 ```
 
-### Deployment
-The application can be deployed using:
-- **Frontend**: Vercel, Netlify, or any static hosting
-- **Backend**: Heroku, Railway, or any Python hosting service
+In a second terminal:
 
-## Contributing
+```bash
+cd frontend
+cp .env.example .env
+npm ci
+npm run dev
+```
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+Vite runs at `http://localhost:8080`; Flask runs at `http://localhost:5000`.
 
-## License
+## Worker and scheduling
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+The API only queues work. Run the worker separately:
 
-## Support
+```bash
+cd backend
+../.venv/bin/python worker.py
+```
 
-For issues and questions:
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue with detailed information
+For a one-shot scheduler invocation use `WORKER_ONCE=1 python worker.py`. Immediate jobs use the current UTC time; scheduled jobs persist their UTC `run_at` and become eligible when due. Cancelling is only safe before a worker claims the job. Recoverable YouTube 429/5xx failures use exponential backoff and the configured retry limit.
+
+YouTube's native scheduled-publication behavior is not used: StudioPilot waits locally and then starts the API upload. Large videos therefore begin uploading at the requested time and publish when the upload completes. Keep the worker online and use `private` if editorial review on YouTube is required.
+
+## Environment variables
+
+See [`.env.example`](.env.example) and [`backend/.env.example`](backend/.env.example).
+
+| Variable | Purpose |
+| --- | --- |
+| `SECRET_KEY` | Long random Flask session secret |
+| `DATABASE_URL` | SQLAlchemy URL; SQLite locally, PostgreSQL in production |
+| `GOOGLE_CLIENT_SECRETS_FILE` | Absolute path to an uncommitted OAuth web-client JSON |
+| `TOKEN_ENCRYPTION_KEY` | Fernet key used to encrypt OAuth credentials at rest |
+| `OPENAI_API_KEY` | Optional metadata and Whisper credential |
+| `OPENAI_MODEL` | Metadata model, default `gpt-4o-mini` |
+| `UPLOAD_FOLDER` / `GENERATED_FOLDER` | Durable media locations |
+| `MAX_CONTENT_LENGTH` | Maximum incoming video bytes |
+| `FRONTEND_URL` | OAuth success destination |
+| `CORS_ORIGINS` | Comma-separated exact browser origins |
+| `JOB_MAX_RETRIES` | Recoverable upload retry ceiling |
+| `VITE_API_URL` | Browser-visible API base URL |
+
+Generate a token-encryption key:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Changing that key makes stored Google credentials unreadable; keep it in a production secret manager and back it up securely.
+
+## Google OAuth and YouTube Data API
+
+1. Create a Google Cloud project and enable **YouTube Data API v3**.
+2. Configure the OAuth consent screen. Add test users while the app is in testing mode.
+3. Create an OAuth 2.0 **Web application** client.
+4. Add `http://localhost:5000/api/auth/callback` as a local authorized redirect URI. Production must use the exact HTTPS API origin plus `/api/auth/callback`.
+5. Download the client JSON outside the repository and set `GOOGLE_CLIENT_SECRETS_FILE`.
+6. Set `TOKEN_ENCRYPTION_KEY`, start the API, then use Settings → Connect with Google.
+
+Scopes requested:
+
+- `youtube.upload` — upload videos.
+- `youtube.readonly` — read channel, playlists, and categories.
+- `youtube.force-ssl` — create playlists, set thumbnails, and add playlist items.
+
+Google may require app verification before external production users can grant these sensitive scopes. YouTube quota is finite; uploads have a substantial quota cost. The UI shows quota and authorization failures as real job failures.
+
+## AI metadata and transcription
+
+AI is optional. Without `OPENAI_API_KEY`, metadata generation returns a deterministic editable fallback and clearly marks its source as `fallback`. With a key, the provider returns title alternatives, description, summary, tags, hashtags, SEO keywords, category and playlist suggestions, chapters, a pinned comment, and social copy. YouTube field limits are checked again when a draft is saved.
+
+Transcription uses OpenAI Whisper when configured. The hosted transcription request has a 25 MB file limit; large videos should have audio extracted and compressed before integrating a production chunking adapter. A failed or unavailable transcript never blocks manual metadata editing or upload. Users can paste and edit transcripts directly.
+
+## Thumbnails and playlists
+
+Generated thumbnails use Pillow templates; custom JPG/PNG upload and selection are supported by the API. The selected thumbnail is uploaded after the video. A YouTube thumbnail permission/error is logged as a warning and does not falsify or roll back a successful video upload.
+
+Playlists and assignable categories come from the connected channel through the official API. Playlist assignment runs after upload. Its failure is recorded separately because the YouTube video already exists at that point.
+
+## Batch workflow
+
+Upload each file to create an independently editable draft. Review metadata, transcript and thumbnail for every item. The `POST /api/batch-jobs` contract accepts `draft_ids`, creates one job per video, and tracks each outcome separately. Failed jobs can be retried individually; exact file checksums and active-job checks prevent accidental duplicates.
+
+## Tests and quality gates
+
+```bash
+cd backend
+../.venv/bin/pytest -q
+flask --app app db upgrade
+
+cd ../frontend
+npm ci
+npm run build       # includes TypeScript project build
+npm run lint
+```
+
+GitHub Actions executes these gates on pushes and pull requests. Tests cover health/readiness, auth truthfulness, validation/error contracts, drafts, no-key metadata fallback, job states, and mocked playlist/YouTube services.
+
+## Production deployment
+
+Use HTTPS for both sites, a strong `SECRET_KEY`, a stable `TOKEN_ENCRYPTION_KEY`, PostgreSQL, shared durable media storage, exact CORS origins, and a secret manager. Run API and worker as separate long-lived processes:
+
+```bash
+gunicorn --chdir backend --workers 2 --bind 0.0.0.0:5000 app:app
+python backend/worker.py
+```
+
+Run `flask --app backend/app.py db upgrade` once during release. Build the frontend with `npm --prefix frontend ci && npm --prefix frontend run build`, then serve `frontend/dist` through a CDN/static host. The included Compose file is a single-host starting point, not a high-availability design.
+
+## API overview
+
+- Health/config: `GET /api/health`, `/api/readiness`, `/api/settings`
+- OAuth: `GET /api/auth/status`, `/login`, `/callback`, `/channel`; `POST /refresh`, `/logout`
+- Drafts: `POST/GET /api/drafts`, `GET/PATCH /api/drafts/:id`
+- Preparation: metadata, transcript, and thumbnail subroutes under `/api/drafts/:id`
+- YouTube data: `/api/playlists`, `/api/playlists/categories`
+- Jobs: create under a draft, list/get, retry/cancel, and `POST /api/batch-jobs`
+- History: `GET /api/history`
+
+Errors consistently return `{ "error": { "code", "message", "details", "request_id" } }`.
+
+## Security notes and limitations
+
+- OAuth client files, encrypted tokens, databases, uploads, generated media, logs, and local environment files are ignored by Git.
+- This is a single-operator/local-user application today; production multi-tenant use requires an external identity provider and per-request ownership checks.
+- OAuth tokens are encrypted in the database, but uploaded media is not encrypted at rest by the application. Use encrypted disks/object storage.
+- Thumbnail generation currently uses graphic templates rather than decoded video-frame extraction.
+- Hosted Whisper's request-size limit means long-form transcription needs a chunking/audio pipeline.
+- Upload progress is worker-to-database polling, not push/WebSocket delivery.
+- Resumable uploads survive transient HTTP retries inside a worker process, but a worker process restart starts a new YouTube upload session.
+
+## Troubleshooting
+
+- **OAuth not configured:** verify the JSON path, redirect URI, Fernet key, and consent-screen test user.
+- **CORS blocked:** set the exact frontend origin, including port, in `CORS_ORIGINS`.
+- **Job stays queued:** run `worker.py` with the same database and media volumes as the API.
+- **Quota exceeded:** wait for quota reset or request quota; retry only after quota is available.
+- **Token cannot be decrypted:** restore the original `TOKEN_ENCRYPTION_KEY`, then reconnect if necessary.
+- **SQLite locked:** stop extra workers or move to PostgreSQL.
 
 ## Roadmap
 
-- [ ] Advanced transcription with Whisper integration
-- [ ] Custom thumbnail templates
-- [ ] Batch video processing
-- [ ] Analytics dashboard
-- [ ] Social media cross-posting
-- [ ] Video scheduling with calendar integration
-- [ ] Advanced SEO optimization
-- [ ] Multi-language support
-
+Multi-user authorization, object-storage adapters, chunked transcription, extracted video-frame thumbnails, worker heartbeats/stale-lock recovery, and WebSocket job events are the next production scaling steps.
