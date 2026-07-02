@@ -8,7 +8,14 @@ export type Draft = {
 };
 export type Job = { id: string; draft_id: string; status: string; progress: number; retry_count: number; run_at: string; last_error?: string };
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+const API_URL = (configuredApiUrl || (import.meta.env.DEV ? "http://localhost:5000/api" : "")).replace(/\/$/, "");
+
+const configurationError = !API_URL
+  ? "Backend API is not configured. Set VITE_API_URL to the deployed backend URL (for example, https://api.example.com/api) and redeploy the frontend."
+  : import.meta.env.PROD && /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(API_URL)
+    ? "Backend API is configured with a local address. Set VITE_API_URL to the public HTTPS backend URL and redeploy the frontend."
+    : "";
 
 export class ApiFailure extends Error {
   code: string;
@@ -16,7 +23,18 @@ export class ApiFailure extends Error {
 }
 
 async function call<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, { credentials: "include", ...options });
+  if (configurationError) throw new ApiFailure(configurationError, "api_configuration_error");
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { credentials: "include", ...options });
+  } catch (error) {
+    const reason = error instanceof Error && error.message ? ` (${error.message})` : "";
+    throw new ApiFailure(
+      `Cannot connect to the backend at ${API_URL}. Check that it is deployed, its /health endpoint is responding, and CORS_ORIGINS includes this frontend origin${reason}.`,
+      "backend_unreachable",
+    );
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApiFailure(body.error?.message || `Request failed (${response.status})`, body.error?.code);
   return body;

@@ -25,3 +25,5 @@ dist/
 frontend/dist/
 *.tsbuildinfo
 .DS_Store
+.vercel/
+.env.local

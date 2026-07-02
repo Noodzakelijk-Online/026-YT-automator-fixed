@@ -14,6 +14,14 @@ def test_health_and_readiness(client):
     assert response.get_json()["checks"]["database"] is True
 
 
+def test_cors_allows_configured_origin_only(client):
+    allowed = client.get("/api/health", headers={"Origin": "http://localhost"})
+    assert allowed.headers["Access-Control-Allow-Origin"] == "http://localhost"
+
+    blocked = client.get("/api/health", headers={"Origin": "https://untrusted.example"})
+    assert "Access-Control-Allow-Origin" not in blocked.headers
+
+
 def test_auth_status_is_truthful(client):
     assert client.get("/api/auth/status").get_json() == {"authenticated": False, "channel": None}
 

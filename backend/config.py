@@ -19,7 +19,11 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
-    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8080,http://localhost:5173").split(",")
+    CORS_ORIGINS = [origin.strip().rstrip("/") for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:8080,http://localhost:5173"
+    ).split(",") if origin.strip()]
+    if os.getenv("FLASK_ENV") == "production" and "*" in CORS_ORIGINS:
+        raise RuntimeError("CORS_ORIGINS must contain exact frontend origins in production; '*' is not allowed")
     TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY", "")
     WORKER_POLL_SECONDS = int(os.getenv("WORKER_POLL_SECONDS", "5"))
     JOB_MAX_RETRIES = int(os.getenv("JOB_MAX_RETRIES", "3"))
