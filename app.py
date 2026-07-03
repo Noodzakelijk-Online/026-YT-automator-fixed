@@ -34,8 +34,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
-# Enable CORS for frontend communication
-CORS(app, origins=['http://localhost:3000', 'http://localhost:5173'])
+# Legacy backend entrypoint: keep the same exact-origin CORS contract as backend/app.py.
+cors_origins = [origin.strip().rstrip('/') for origin in os.environ.get(
+    'CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:8080'
+).split(',') if origin.strip()]
+if os.environ.get('FLASK_ENV') == 'production' and '*' in cors_origins:
+    raise RuntimeError("CORS_ORIGINS must contain exact frontend origins in production; '*' is not allowed")
+CORS(app, origins=cors_origins, supports_credentials=True)
 
 # YouTube API scopes
 SCOPES = [
@@ -135,4 +140,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     app.run(host='0.0.0.0', port=port, debug=debug)
-

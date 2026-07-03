@@ -103,8 +103,7 @@ PORT=5000
 
 #### Frontend (.env)
 ```
-REACT_APP_API_URL=https://your-backend-url.com/api
-REACT_APP_ENV=production
+VITE_API_URL=https://your-backend-url.com/api
 ```
 
 ### Google API Setup
@@ -230,4 +229,3 @@ For issues and questions:
 2. Review the main README.md
 3. Check API documentation
 4. Create an issue with detailed information
-

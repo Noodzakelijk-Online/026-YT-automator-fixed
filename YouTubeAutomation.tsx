@@ -15,7 +15,16 @@ import SocialMediaLinks from './SocialMediaLinks';
 import SchedulingFeature from './SchedulingFeature';
 import AuthenticationStatus from './AuthenticationStatus';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL?.trim() || (import.meta.env.DEV ? 'http://localhost:5000/api' : '')).replace(/\/$/, '');
+
+async function apiFetch(path: string, options?: RequestInit) {
+  if (!API_BASE_URL) throw new Error('Backend API is not configured. Set VITE_API_URL in Vercel and redeploy.');
+  if (import.meta.env.PROD && /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(API_BASE_URL)) {
+    throw new Error('VITE_API_URL points to a local address. Configure the public HTTPS backend URL in Vercel.');
+  }
+  try { return await fetch(`${API_BASE_URL}${path}`, options); }
+  catch { throw new Error(`Cannot connect to the backend at ${API_BASE_URL}. Check the deployment and CORS configuration.`); }
+}
 
 const YouTubeAutomation = () => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -31,7 +40,7 @@ const YouTubeAutomation = () => {
   const { data: authStatus, refetch: refetchAuth } = useQuery({
     queryKey: ['authStatus'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/auth/status`);
+      const response = await apiFetch('/auth/status');
       if (!response.ok) throw new Error('Failed to check auth status');
       return response.json();
     },
@@ -47,7 +56,7 @@ const YouTubeAutomation = () => {
   // Generate metadata mutation
   const generateMetadataMutation = useMutation({
     mutationFn: async (data: { text: string; topic?: string; audience?: string; style?: string }) => {
-      const response = await fetch(`${API_BASE_URL}/metadata/generate`, {
+      const response = await apiFetch('/metadata/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +74,7 @@ const YouTubeAutomation = () => {
   // Upload video mutation
   const uploadVideoMutation = useMutation({
     mutationFn: async (uploadData: FormData) => {
-      const response = await fetch(`${API_BASE_URL}/upload/video`, {
+      const response = await apiFetch('/upload/video', {
         method: 'POST',
         body: uploadData,
       });
@@ -146,7 +155,7 @@ const YouTubeAutomation = () => {
 
   const handleAuthenticate = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`);
+      const response = await apiFetch('/auth/login');
       const data = await response.json();
       
       if (data.auth_url) {
@@ -277,4 +286,3 @@ const YouTubeAutomation = () => {
 };
 
 export default YouTubeAutomation;
-
